@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Duke LDOC 2026 — 活动甘特图</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: #f5f5f0;
+  color: #1a1a1a;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  min-height: 100vh;
+}
+
+.page { max-width: 1500px; margin: 0 auto; padding: 40px 24px 80px; }
+
+/* HEADER */
+header { margin-bottom: 32px; }
+.header-top { display:flex; align-items:baseline; gap:16px; margin-bottom:6px; }
+h1 { font-size: 28px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.5px; }
+.date-badge { background:#003087; color:#fff; font-size:12px; font-weight:600; padding:3px 10px; border-radius:20px; }
+.sub { font-size: 13px; color: #666; }
+
+/* LEGEND */
+.legend { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:28px; }
+.leg { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:500; color:#444; background:#fff; border:1px solid #e5e5e5; padding:4px 10px; border-radius:20px; cursor:pointer; user-select:none; transition:all .18s; opacity:.55; }
+.leg:hover { opacity:.85; }
+.leg.active { opacity:1; border-color:#333; background:#f0f0f0; font-weight:700; color:#111; box-shadow:0 1px 4px rgba(0,0,0,.12); }
+.dot { width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+
+/* CHART */
+.chart-wrap { background:#fff; border:1px solid #e0e0e0; border-radius:12px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.06); }
+.scroll-x { overflow-x:auto; }
+.inner { min-width:1200px; }
+
+/* TIME HEADER */
+.time-header { display:flex; border-bottom:2px solid #e8e8e8; position:sticky; top:0; z-index:20; background:#fafafa; }
+.lbl-col { width:260px; flex-shrink:0; padding:10px 14px; border-right:2px solid #e8e8e8; font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:#999; display:flex; align-items:center; }
+.ticks { flex:1; display:flex; }
+.tick { flex:1; text-align:center; padding:10px 0; font-size:11px; font-weight:700; color:#888; border-right:1px solid #ebebeb; }
+.tick:last-child { border-right:none; }
+.tick.hour-now { color:#e03030; font-weight:800; }
+
+/* SECTION HEADER */
+.sec-hdr {
+  padding:7px 16px;
+  background:#f7f7f7;
+  border-bottom:1px solid #eaeaea;
+  border-top:2px solid #e0e0e0;
+  font-size:10px; font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:#888;
+  display:flex; align-items:center; gap:8px;
+}
+.sec-hdr:first-of-type { border-top:none; }
+
+/* ROW */
+.row {
+  display:flex; align-items:stretch;
+  border-bottom:1px solid #f0f0f0;
+  min-height:56px;
+  transition:background .1s;
+}
+.row:hover { background:#fafbff; }
+.row:last-child { border-bottom:none; }
+
+/* LABEL COL */
+.row-label {
+  width:260px; flex-shrink:0;
+  padding:10px 14px;
+  border-right:2px solid #e8e8e8;
+  display:flex; flex-direction:column; justify-content:center; gap:3px;
+}
+.r-name { font-size:12px; font-weight:700; color:#1a1a1a; line-height:1.3; }
+.r-loc {
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:10.5px; font-weight:500; color:#666;
+}
+.r-loc::before { content:'📍'; font-size:9px; }
+
+/* BAR AREA */
+.bar-area { flex:1; position:relative; display:flex; align-items:center; }
+.bar-area::before {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background-image: repeating-linear-gradient(90deg, transparent, transparent calc(100%/14 - 1px), #f0f0f0 calc(100%/14 - 1px), #f0f0f0 calc(100%/14));
+}
+
+/* BAR */
+.bar {
+  position:absolute;
+  height:30px;
+  border-radius:6px;
+  display:flex; align-items:center;
+  padding:0 9px;
+  font-size:10.5px; font-weight:600;
+  color:#fff;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  cursor:pointer;
+  transition:filter .15s, transform .15s, box-shadow .15s;
+  z-index:2;
+}
+.bar:hover { filter:brightness(.92); transform:scaleY(1.06); box-shadow:0 3px 12px rgba(0,0,0,.18); z-index:6; }
+.bar.main-show { height:36px; font-size:12px; font-weight:800; }
+
+/* COLORS */
+.c-wellness { background:#0aad8c; }
+.c-food     { background:#e07b2a; }
+.c-giveaway { background:#c8971a; }
+.c-craft    { background:#3d6fd4; }
+.c-concert  { background:#c0336b; }
+.c-darty    { background:#8a3dbd; }
+.c-beer     { background:#b83232; }
+.bar.main-show { background:linear-gradient(90deg,#c0336b,#8a3dbd); box-shadow:0 2px 14px rgba(192,51,107,.35); }
+
+/* NOW LINE */
+.now-line {
+  position:absolute; top:0; bottom:0; width:2px;
+  background:#e03030; z-index:15; pointer-events:none;
+}
+.now-label {
+  position:absolute; top:-18px; left:50%; transform:translateX(-50%);
+  background:#e03030; color:#fff;
+  font-size:8px; font-weight:800; letter-spacing:.08em;
+  padding:1px 5px; border-radius:3px; white-space:nowrap;
+}
+
+/* POPUP CARD */
+.popup {
+  position:fixed; z-index:300;
+  background:#fff;
+  border:1px solid #ddd;
+  border-radius:12px;
+  padding:0;
+  width:300px;
+  box-shadow:0 8px 32px rgba(0,0,0,.14);
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .15s;
+  overflow:hidden;
+}
+.popup.show { opacity:1; }
+
+.popup-header {
+  padding:12px 14px 10px;
+  border-bottom:1px solid #f0f0f0;
+}
+.popup-cat {
+  font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+  margin-bottom:4px; opacity:.85;
+}
+.popup-name {
+  font-size:14px; font-weight:800; color:#1a1a1a; line-height:1.3;
+  margin-bottom:2px;
+}
+.popup-body { padding:10px 14px 12px; display:flex; flex-direction:column; gap:7px; }
+
+.popup-row { display:flex; align-items:flex-start; gap:8px; font-size:12px; }
+.popup-icon { font-size:13px; flex-shrink:0; margin-top:1px; }
+.popup-text { color:#333; line-height:1.5; }
+.popup-text strong { color:#111; font-weight:600; display:block; font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:#888; margin-bottom:1px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="header-top">
+      <h1>Duke LDOC 2026 · 活动甘特图</h1>
+      <span class="date-badge">Wednesday, April 22</span>
+    </div>
+
+  <div style="font-size:13px;color:#888;margin-top:6px;margin-bottom:0;padding-left:0;">🖱️ 鼠标悬停活动色块查看详情</div>
+  </header>
+
+  <div class="legend" id="slicer">
+    <div class="leg active" data-cat="all" onclick="filterCat('all')"><div class="dot" style="background:#555"></div>全部 All</div>
+    <div class="leg" data-cat="c-wellness" onclick="filterCat('c-wellness')"><div class="dot" style="background:#0aad8c"></div>Wellness 健康</div>
+    <div class="leg" data-cat="c-food" onclick="filterCat('c-food')"><div class="dot" style="background:#e07b2a"></div>Food 美食</div>
+    <div class="leg" data-cat="c-giveaway" onclick="filterCat('c-giveaway')"><div class="dot" style="background:#c8971a"></div>Giveaways 赠品</div>
+    <div class="leg" data-cat="c-craft" onclick="filterCat('c-craft')"><div class="dot" style="background:#3d6fd4"></div>Arts & Crafts 手工</div>
+    <div class="leg" data-cat="c-concert" onclick="filterCat('c-concert')"><div class="dot" style="background:#c0336b"></div>Concert 演出</div>
+    <div class="leg" data-cat="c-darty" onclick="filterCat('c-darty')"><div class="dot" style="background:#8a3dbd"></div>派对 Darties</div>
+    <div class="leg" data-cat="c-beer" onclick="filterCat('c-beer')"><div class="dot" style="background:#b83232"></div>Beer Garden</div>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="scroll-x">
+      <div class="inner" id="chart"></div>
+    </div>
+  </div>
+</div>
+
+<div class="popup" id="popup">
+  <div class="popup-header" id="ph"></div>
+  <div class="popup-body" id="pb"></div>
+</div>
+
+<script>
+const S=600, E=1440, T=840;
+const HOURS=['10AM','11AM','12PM','1PM','2PM','3PM','4PM','5PM','6PM','7PM','8PM','9PM','10PM','11PM','12AM'];
+const m=(h,n)=>h*60+n;
+const lft=(t)=>((t-S)/T*100).toFixed(3)+'%';
+const wd=(s,e)=>((e-s)/T*100).toFixed(3)+'%';
+const fmt=t=>{const h=Math.floor(t/60)%24,n=t%60,ap=h>=12?'PM':'AM',hh=h>12?h-12:(h||12);return hh+':'+(n<10?'0':'')+n+' '+ap;};
+
+const CMAP={
+  'c-wellness':'#0aad8c','c-food':'#e07b2a','c-giveaway':'#c8971a',
+  'c-craft':'#3d6fd4','c-concert':'#c0336b','c-darty':'#8a3dbd','c-beer':'#b83232'
+};
+const CNAME={
+  'c-wellness':'健康 Wellness','c-food':'美食 Food','c-giveaway':'赠品 Giveaways',
+  'c-craft':'手工艺 Arts & Crafts','c-concert':'演出 Concert','c-darty':'派对 Darties','c-beer':'啤酒花园 Beer Garden'
+};
+
+const sections=[
+  {label:'🌅 早段 Morning',rows:[
+    {name:'Duke Rec Pilates',zhName:'健身普拉提',loc:'K-Ville',s:m(10,0),e:m(10,45),cat:'c-wellness',desc:'互动体验，无酒精活动'},
+    {name:'DuWell Cycling (Session 1)',zhName:'DuWell 动感单车（第一节）',loc:'Wellness Center 148',s:m(10,0),e:m(10,45),cat:'c-wellness',desc:'与 Cyclebar Chapel Hill 合作的骑行课，互动体验'},
+    {name:'Duke PAWS Puppies 🐶',zhName:'Duke PAWS 撸狗活动',loc:'BC Plaza',s:m(10,0),e:m(11,0),cat:'c-wellness',desc:'来撸狗放松吧！互动体验，无酒精'},
+    {name:'VR Escape Room',zhName:'VR 密室逃脱',loc:'Link',s:m(10,0),e:m(12,0),cat:'c-craft',desc:'虚拟现实密室逃脱体验，互动，无酒精'},
+  ]},
+  {label:'☕ 早午餐 Brunch',rows:[
+    {name:'Duke Stores Brunch',zhName:'Duke 书店早午餐',loc:'Craven Quad',s:m(10,0),e:m(12,0),cat:'c-food',desc:'提供贝果、香蕉和咖啡 🥯☕'},
+    {name:'Duke Libraries Brunch',zhName:'Duke 图书馆早午餐',loc:'Kilgo Quad',s:m(10,0),e:m(12,0),cat:'c-food',desc:'提供迷你饼干和甜甜圈 🍩'},
+    {name:'DISC Brunch',zhName:'DISC 早午餐',loc:'Keohane Quad',s:m(10,0),e:m(12,0),cat:'c-food',desc:'提供 Monuts 甜甜圈 🍩'},
+    {name:'MarComms Brunch',zhName:'MarComms 早午餐',loc:'Upper Few Quad',s:m(10,0),e:m(12,0),cat:'c-food',desc:'提供甜甜圈 🍩'},
+  ]},
+  {label:'🎪 全天长线活动 All-Day',rows:[
+    {name:'Duke Rec Lawn Games',zhName:'Duke Rec 草坪游戏',loc:'Chapel Quad',s:m(10,0),e:m(13,30),cat:'c-wellness',desc:'户外草坪互动游戏，无酒精'},
+    {name:'Chapel Activities 🍭',zhName:'教堂广场活动',loc:'Chapel Quad',s:m(10,0),e:m(14,0),cat:'c-giveaway',desc:'棉花糖、爆米花和 T 恤免费领取！'},
+    {name:'Hand Chain Jewelry',zhName:'手链珠宝制作',loc:'Chapel Quad',s:m(10,0),e:m(14,0),cat:'c-craft',desc:'DIY 手链珠宝，互动体验，有赠品'},
+    {name:'Poetry Fox',zhName:'诗歌狐现场创作',loc:'Outside Kraft',s:m(10,0),e:m(14,0),cat:'c-craft',desc:'现场即兴诗歌创作，互动体验'},
+  ]},
+  {label:'🎤 演出与运动',rows:[
+    {name:'Student Performance Groups',zhName:'学生表演团体',loc:'BC Plaza Stage',s:m(10,30),e:m(12,30),cat:'c-concert',desc:'多个学生表演团体轮流登台'},
+    {name:'Chapel Climbs 🧗',zhName:'教堂攀登',loc:'Duke Chapel',s:m(10,30),e:m(13,30),cat:'c-wellness',desc:'攀登杜克教堂！需提前在 DukeGroups 报名，限 80 人，无酒精'},
+  ]},
+  {label:'🎵 美食 & 娱乐',rows:[
+    {name:'Sound Bath',zhName:'声音浴冥想',loc:'Penn Pavilion',s:m(11,0),e:m(12,0),cat:'c-wellness',desc:'沉浸式声音疗愈体验，互动，无酒精，名额有限'},
+    {name:'Ice Cream & Popcorn 🍦',zhName:'免费冰淇淋和爆米花',loc:'BC Plaza',s:m(11,0),e:m(13,0),cat:'c-food',desc:'由 Pincho Loco 和 Mad Popper 提供，免费赠品'},
+    {name:'VisArts Sunglasses Deco 🕶️',zhName:'DIY 太阳镜装饰',loc:'Chapel Quad',s:m(11,0),e:m(13,0),cat:'c-craft',desc:'自己动手装饰专属太阳镜，互动，有赠品'},
+    {name:'Kona Ice Shaved Ice 🧊',zhName:'Kona Ice 刨冰车',loc:'Wannamaker Dorm Lane',s:m(11,0),e:m(13,0),cat:'c-food',desc:'免费刨冰，有赠品'},
+    {name:'Food Trucks 🚚',zhName:'美食车',loc:'Wellness Lot',s:m(11,0),e:m(14,0),cat:'c-food',desc:'可用 Food Points 购买\n· Gussy\'s · Latin Effect · Bulkogi · Magnificent Concessions'},
+    {name:'Comedy Magician 🎩',zhName:'喜剧魔术师',loc:'BC Plaza',s:m(11,0),e:m(14,0),cat:'c-concert',desc:'现场喜剧魔术表演，互动娱乐'},
+    {name:"McDonald's New Drinks 🍹",zhName:'麦当劳新饮料免费试饮',loc:'BC Plaza',s:m(11,0),e:m(14,0),cat:'c-food',desc:'LDOC 独家限定！免费试喝三款新饮料：\n· 草莓西瓜清爽饮\n· 雪碧浆果爆炸\n· 芒果菠萝清爽饮'},
+    {name:'DuWell Cycling (Session 2)',zhName:'DuWell 动感单车（第二节）',loc:'Wellness Center 148',s:m(11,15),e:m(12,0),cat:'c-wellness',desc:'与 Cyclebar Chapel Hill 合作的第二节骑行课'},
+  ]},
+  {label:'🎨 手工创作',rows:[
+    {name:'Screen-Printed Tote Bags 👜',zhName:'丝网印刷环保袋',loc:'Chapel Quad',s:m(12,0),e:m(14,0),cat:'c-giveaway',desc:'现场丝网印刷专属环保袋，免费赠品'},
+    {name:'Sand Art Stand',zhName:'沙画制作',loc:'Chapel Quad',s:m(12,0),e:m(14,0),cat:'c-craft',desc:'制作专属沙画，互动，有赠品'},
+    {name:'DuWell Mindful Painting 🎨',zhName:'正念绘画',loc:'Wellness Center Atrium',s:m(12,0),e:m(14,0),cat:'c-wellness',desc:'正念冥想绘画体验，互动活动'},
+    {name:'SPEV Wall Art',zhName:'SPEV 墙体艺术创作',loc:'BC Plaza',s:m(12,0),e:m(14,0),cat:'c-craft',desc:'参与集体墙体艺术创作，互动'},
+    {name:'Fairy Hair ✨',zhName:'仙女发饰编织',loc:'BC Plaza',s:m(12,0),e:m(15,0),cat:'c-giveaway',desc:'编织专属仙女发饰，互动，有赠品'},
+    {name:'Zim Zoom Photo Booth 📸',zhName:'Zim Zoom 拍照亭',loc:'BC Plaza',s:m(12,0),e:m(15,30),cat:'c-giveaway',desc:'专属拍照亭，留下纪念，互动，有赠品'},
+    {name:'Jazz@ 🎷',zhName:'爵士乐现场演出',loc:'BC Plaza Bookstore Stage',s:m(12,30),e:m(14,30),cat:'c-concert',desc:'BC Plaza 书店舞台爵士乐现场演出'},
+    {name:'Succulents / Mini Pot 🌵',zhName:'多肉植物 / 迷你花盆',loc:'BC Plaza',s:m(12,30),e:m(14,30),cat:'c-giveaway',desc:'免费领取多肉植物或迷你花盆，互动，有赠品'},
+  ]},
+  {label:'🎰 午后娱乐',rows:[
+    {name:'Casino Games 🎲',zhName:'赌场游戏',loc:'Outside Kraft',s:m(13,0),e:m(16,0),cat:'c-craft',desc:'多种赌场桌游体验，互动'},
+    {name:'BSA Cookout 🍖',zhName:'BSA 烧烤派对',loc:'Keohane Quad',s:m(13,0),e:m(16,30),cat:'c-food',desc:'黑人学生联合会烧烤派对，提供食物和赠品'},
+  ]},
+  {label:'🎉 Darties 兄弟会派对',rows:[
+    {name:'Darty: ATO + Sigma Nu',zhName:'派对：ATO + Sigma Nu',loc:'Wannamaker Quad',s:m(13,0),e:m(17,0),cat:'c-darty',desc:'Alpha Tau Omega 与 Sigma Nu 联合举办'},
+    {name:'Darty: KA + Alpha Delta Phi',zhName:'派对：KA + Alpha Delta Phi',loc:'Craven Quad',s:m(13,0),e:m(17,0),cat:'c-darty',desc:'Kappa Alpha Order 与 Alpha Delta Phi 联合举办'},
+    {name:'Darty: Sigma Chi + AEPi',zhName:'派对：Sigma Chi + AEPi',loc:'Few Quad',s:m(13,0),e:m(17,0),cat:'c-darty',desc:'Sigma Chi 与 Alpha Epsilon Pi 联合举办'},
+    {name:'Darty: Lambda Phi Epsilon',zhName:'派对：Lambda Phi Epsilon',loc:'Few Quad',s:m(13,0),e:m(17,0),cat:'c-darty',desc:'Lambda Phi Epsilon 举办'},
+    {name:'Darty: Mirecourt',zhName:'派对：Mirecourt',loc:'Kilgo Quad',s:m(13,0),e:m(17,0),cat:'c-darty',desc:'Mirecourt 举办'},
+    {name:'Darty: Pike + Wayne Manor',zhName:'派对：Pike + Wayne Manor',loc:'Crowell Quad',s:m(13,0),e:m(17,0),cat:'c-darty',desc:'Pi Kappa Alpha 与 Wayne Manor 联合举办'},
+    {name:'Darty: Theta Chi',zhName:'派对：Theta Chi',loc:'Hollows Quad',s:m(13,0),e:m(17,0),cat:'c-darty',desc:'Theta Chi 举办'},
+    {name:'🍺 L-LDOC Beer Garden',zhName:'L-LDOC 啤酒花园（仅限大四）',loc:'Clocktower Quad',s:m(13,30),e:m(17,30),cat:'c-beer',desc:'⚠️ 仅限大四学长学姐！需凭热粉色 L-LDOC 手环入场\n提供免费食物、啤酒 & 苹果酒、专属周边'},
+  ]},
+  {label:'🌇 下午活动 & 美食',rows:[
+    {name:'Stuff-a-Critter 🐻',zhName:'填充玩偶制作',loc:'Chapel Quad',s:m(14,0),e:m(15,0),cat:'c-giveaway',desc:'亲手制作专属填充玩偶，互动，有赠品'},
+    {name:'The I&E Oasis',zhName:'创新创业绿洲',loc:'BC Plaza',s:m(14,0),e:m(16,0),cat:'c-craft',desc:'创新与创业主题活动，无酒精，有赠品'},
+    {name:'Alumni Messages 💌',zhName:'校友寄语墙',loc:'Chapel Quad',s:m(14,0),e:m(16,0),cat:'c-craft',desc:'留下或阅读校友的毕业寄语，互动'},
+    {name:'Food Stand #1 🥩',zhName:'美食摊 #1 — 迷你汉堡',loc:'Clocktower Quad',s:m(14,0),e:m(16,0),cat:'c-food',desc:'迷你汉堡配薯片\n（提供无麸质 + 纯素选项）免费'},
+    {name:'Food Stand #2 🌮',zhName:'美食摊 #2 — 墨西哥卷饼吧',loc:'Clocktower Quad',s:m(14,0),e:m(16,0),cat:'c-food',desc:'墨西哥卷饼吧\n（提供无麸质 + 素食选项）免费'},
+    {name:'Food Stand #3 🧀',zhName:'美食摊 #3 — 迷你熟食船',loc:'Statue Quad',s:m(14,30),e:m(16,30),cat:'c-food',desc:'迷你熟食 / 奶酪 / 蔬菜船\n（提供无麸质 + 无乳糖 + 纯素选项）免费'},
+    {name:'Food Stand #4 🥨',zhName:'美食摊 #4 — 小食拼盘',loc:'BC Plaza',s:m(14,30),e:m(16,30),cat:'c-food',desc:'热狗卷、迷你椒盐脆饼（素食）、薯片配芝士酱（无麸质）免费'},
+  ]},
+  {label:'🎤 LDOC CONCERT 年度演唱会',rows:[
+    {name:'🎤 LDOC CONCERT',zhName:'LDOC 年度演唱会',loc:'Abele Quad',s:m(17,0),e:m(22,30),cat:'c-concert main-show',desc:'5:00 PM — 开门入场，DJ 暖场\n5:30–6:00 PM — Grace Davis\n6:30–7:30 PM — WHATMORE\n8:00–9:00 PM — Slayyyter\n9:30–10:30 PM — Quavo 压轴\nDJ：David Llera & Bayo Oshinusi 间场'},
+  ]},
+  {label:'🌙 深夜 Late Night',rows:[
+    {name:'Food Trucks Late Night 🚚',zhName:'深夜美食车',loc:'Wellness Lot',s:m(22,0),e:m(24,0),cat:'c-food',desc:'可用 Food Points 购买\n· Sister Liu\'s · Flat Drum · Bon Fritay · Yalla!'},
+    {name:'Midnight Pizza 🍕',zhName:'午夜披萨',loc:'Chapel Quad',s:m(22,30),e:m(23,0),cat:'c-food',desc:'免费午夜披萨，有赠品'},
+  ]},
+];
+
+const chart=document.getElementById('chart');
+const popup=document.getElementById('popup');
+const ph=document.getElementById('ph');
+const pb=document.getElementById('pb');
+
+// ET time
+const now=new Date();
+const etStr=now.toLocaleString('en-US',{timeZone:'America/New_York'});
+const etDate=new Date(etStr);
+const nowMin=etDate.getHours()*60+etDate.getMinutes();
+
+// Time header
+const hdr=document.createElement('div');
+hdr.style.cssText='display:flex;border-bottom:2px solid #e8e8e8;position:sticky;top:0;z-index:20;background:#fafafa;';
+const lc=document.createElement('div');
+lc.style.cssText='width:260px;flex-shrink:0;padding:10px 14px;border-right:2px solid #e8e8e8;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#999;display:flex;align-items:center;';
+lc.textContent='Activity / Location';
+hdr.appendChild(lc);
+const tks=document.createElement('div'); tks.style.cssText='flex:1;display:flex;';
+const nowHour=Math.floor(nowMin/60);
+HOURS.forEach((h,i)=>{
+  const t=document.createElement('div');
+  const hNum=i+10;
+  const isNow=(hNum===nowHour)||(hNum===24&&nowHour===0);
+  t.style.cssText=`flex:1;text-align:center;padding:10px 0;font-size:11px;font-weight:${isNow?800:700};color:${isNow?'#e03030':'#888'};border-right:1px solid #ebebeb;`;
+  t.textContent=h; tks.appendChild(t);
+});
+hdr.appendChild(tks);
+chart.appendChild(hdr);
+
+// Sections
+sections.forEach(sec=>{
+  const sh=document.createElement('div');
+  sh.style.cssText='padding:7px 16px;background:#f7f7f7;border-bottom:1px solid #eaeaea;border-top:2px solid #e0e0e0;font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#777;';
+  sh.classList.add('sec-hdr-el');
+  sh.textContent=sec.label;
+  chart.appendChild(sh);
+
+  sec.rows.forEach(r=>{
+    const row=document.createElement('div');
+    const mainCatEarly=r.cat.split(' ')[0];
+    row.style.cssText='display:flex;align-items:stretch;border-bottom:1px solid #f0f0f0;min-height:56px;transition:background .1s,opacity .18s;';
+    row.dataset.cat=mainCatEarly;
+    row.onmouseenter=()=>row.style.background='#fafbff';
+    row.onmouseleave=()=>row.style.background='';
+
+    // Label
+    const lbl=document.createElement('div');
+    lbl.style.cssText='width:260px;flex-shrink:0;padding:10px 14px;border-right:2px solid #e8e8e8;display:flex;flex-direction:column;justify-content:center;gap:2px;';
+    const nm=document.createElement('div');
+    nm.style.cssText='font-size:12px;font-weight:700;color:#1a1a1a;line-height:1.3;';
+    nm.textContent=r.name;
+    const zh=document.createElement('div');
+    zh.style.cssText='font-size:11px;font-weight:600;color:#3d6fd4;line-height:1.2;';
+    zh.textContent=r.zhName||'';
+    const lo=document.createElement('div');
+    lo.style.cssText='font-size:10px;font-weight:500;color:#888;display:flex;align-items:center;gap:3px;';
+    lo.innerHTML='<span style="font-size:9px">📍</span>'+r.loc;
+    lbl.appendChild(nm);
+    if(r.zhName) lbl.appendChild(zh);
+    lbl.appendChild(lo);
+    row.appendChild(lbl);
+
+    // Bar area
+    const ba=document.createElement('div');
+    ba.style.cssText='flex:1;position:relative;display:flex;align-items:center;';
+
+    // grid
+    const gl=document.createElement('div');
+    gl.style.cssText='position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(90deg,transparent,transparent calc(100%/14 - 1px),#f0f0f0 calc(100%/14 - 1px),#f0f0f0 calc(100%/14));';
+    ba.appendChild(gl);
+
+    // now line
+    if(nowMin>=S&&nowMin<=E){
+      const nl=document.createElement('div');
+      nl.style.cssText=`position:absolute;left:${lft(nowMin)};top:0;bottom:0;width:2px;background:#e03030;z-index:15;pointer-events:none;`;
+      const nlb=document.createElement('div');
+      nlb.style.cssText='position:absolute;top:-18px;left:50%;transform:translateX(-50%);background:#e03030;color:#fff;font-size:8px;font-weight:800;letter-spacing:.08em;padding:1px 5px;border-radius:3px;white-space:nowrap;';
+      nlb.textContent='NOW'; nl.appendChild(nlb); ba.appendChild(nl);
+    }
+
+    // bar
+    const cats=r.cat.split(' ');
+    const mainCat=mainCatEarly;
+    const isMain=cats.includes('main-show');
+    const bar=document.createElement('div');
+    const dur=r.e-r.s;
+    const bgColor=isMain?'linear-gradient(90deg,#c0336b,#8a3dbd)':(CMAP[mainCat]||'#888');
+    const shadow=isMain?'box-shadow:0 2px 14px rgba(192,51,107,.35);':'';
+    bar.style.cssText=`position:absolute;left:${lft(r.s)};width:${wd(r.s,r.e)};height:${isMain?36:30}px;border-radius:6px;cursor:pointer;transition:filter .15s,transform .15s,box-shadow .15s;z-index:2;background:${bgColor};${shadow}`;
+
+    // Time label — sits on top of bar, white text, never clipped
+    const fmt24=t=>{const h=Math.floor(t/60)%24,n=t%60;return (h<10?'0':'')+h+':'+(n<10?'0':'')+n;};
+    const timeLabel=document.createElement('div');
+    timeLabel.style.cssText=`position:absolute;left:${lft(r.s)};top:50%;transform:translateY(-50%);white-space:nowrap;pointer-events:none;z-index:3;font-size:10.5px;font-weight:700;color:#fff;padding:0 8px;line-height:1;text-shadow:0 1px 4px rgba(0,0,0,.5);`;
+    timeLabel.textContent=fmt24(r.s)+' – '+fmt24(r.e);
+    ba.appendChild(timeLabel);
+
+    // Popup
+    bar.addEventListener('mouseenter',ev=>{
+      const color=CMAP[mainCat]||'#888';
+      ph.innerHTML=`
+        <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${color};margin-bottom:4px">${CNAME[mainCat]||''}</div>
+        <div style="font-size:15px;font-weight:800;color:#1a1a1a;line-height:1.3;margin-bottom:2px">${r.zhName||r.name}</div>
+        <div style="font-size:11px;font-weight:500;color:#888;">${r.name}</div>`;
+      pb.innerHTML='';
+
+      // Time row
+      const tr=document.createElement('div');
+      tr.style.cssText='display:flex;align-items:flex-start;gap:8px;font-size:12px;padding:0;';
+      tr.innerHTML=`<span style="font-size:14px;flex-shrink:0">⏰</span><div style="color:#333"><strong style="display:block;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#999;margin-bottom:2px">时间</strong>${fmt(r.s)} — ${fmt(r.e)} · ${Math.round((r.e-r.s)/60*10)/10}h</div>`;
+      pb.appendChild(tr);
+
+      // Location row
+      const lr=document.createElement('div');
+      lr.style.cssText='display:flex;align-items:flex-start;gap:8px;font-size:12px;';
+      lr.innerHTML=`<span style="font-size:14px;flex-shrink:0">📍</span><div style="color:#333"><strong style="display:block;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#999;margin-bottom:2px">地点</strong>${r.loc}</div>`;
+      pb.appendChild(lr);
+
+      // Desc row
+      if(r.desc){
+        const dr=document.createElement('div');
+        dr.style.cssText='display:flex;align-items:flex-start;gap:8px;font-size:12px;border-top:1px solid #f0f0f0;padding-top:7px;margin-top:2px;';
+        dr.innerHTML=`<span style="font-size:14px;flex-shrink:0">ℹ️</span><div style="color:#333;line-height:1.6"><strong style="display:block;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#999;margin-bottom:2px">详情</strong>${r.desc.replace(/\n/g,'<br>')}</div>`;
+        pb.appendChild(dr);
+      }
+
+      popup.classList.add('show');
+    });
+
+    bar.addEventListener('mousemove',ev=>{
+      const x=ev.clientX+16, y=ev.clientY+16;
+      popup.style.left=(x+310>window.innerWidth?ev.clientX-318:x)+'px';
+      popup.style.top=(y+popup.offsetHeight>window.innerHeight?ev.clientY-popup.offsetHeight-8:y)+'px';
+    });
+    bar.addEventListener('mouseleave',()=>popup.classList.remove('show'));
+
+    ba.appendChild(bar);
+    row.appendChild(ba);
+    chart.appendChild(row);
+  });
+});
+
+// ── Slicer filter ──────────────────────────────────────
+let activeCat = 'all';
+
+function filterCat(cat) {
+  activeCat = cat;
+
+  // Update button states
+  document.querySelectorAll('#slicer .leg').forEach(el => {
+    el.classList.toggle('active', el.dataset.cat === cat);
+  });
+
+  // Show/hide rows
+  document.querySelectorAll('#chart [data-cat]').forEach(el => {
+    const match = cat === 'all' || el.dataset.cat === cat;
+    el.style.display = match ? 'flex' : 'none';
+  });
+
+  // Show/hide section headers — hide if all rows in section hidden
+  const shdrs = document.querySelectorAll('#chart .sec-hdr-el');
+  shdrs.forEach(hdr => {
+    let sibling = hdr.nextElementSibling;
+    let hasVisible = false;
+    while (sibling && !sibling.classList.contains('sec-hdr-el')) {
+      if (sibling.dataset.cat && sibling.style.display !== 'none') hasVisible = true;
+      sibling = sibling.nextElementSibling;
+    }
+    hdr.style.display = hasVisible ? '' : 'none';
+  });
+}
+
+// Initialize — all active
+filterCat('all');
+</script>
+</body>
+</html>
